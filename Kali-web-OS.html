@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kali Mobile Ultimate - Full SFX Edition</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap');
+        :root { --kali-blue: #5570dd; --terminal-green: #00ff41; --window-bg: rgba(10, 10, 10, 0.95); }
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #000; font-family: 'Fira Code', monospace; color: white; user-select: none; }
+
+        /* BOOT & LOGIN */
+        #boot-loader { position: fixed; inset: 0; background: #000; z-index: 10000; padding: 25px; font-size: 12px; color: #aaa; overflow-y: auto; line-height: 1.6; }
+        .ok { color: var(--terminal-green); font-weight: bold; }
+        #login-screen { position: fixed; inset: 0; background: #000; display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; opacity: 0; transition: opacity 0.8s ease; }
+        .kali-logo { width: 110px; filter: drop-shadow(0 0 20px var(--kali-blue)); margin-bottom: 30px; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 0.8; } 50% { opacity: 1; transform: scale(1.05); } 100% { opacity: 0.8; } }
+        #pass-field { background: transparent; border: 1px solid #222; padding: 12px; color: var(--terminal-green); text-align: center; border-bottom: 2px solid var(--kali-blue); outline: none; width: 250px; }
+
+        /* WALLPAPER & MATRIX */
+        #wallpaper-layer { position: fixed; inset: 0; background: url('https://wallpapers.com/images/hd/kali-linux-blue-dragon-4k-7c8y9lyqf6d89s6a.jpg') center/cover; z-index: 1; opacity: 0.7; display: none; }
+        #matrix-canvas { position: fixed; inset: 0; z-index: 2; opacity: 0.2; pointer-events: none; display: none; }
+        #main-os { position: relative; z-index: 10; width: 100%; height: 100%; display: none; overflow: hidden; }
+
+        /* DESKTOP */
+        #desktop { position: absolute; top: 0; left: 0; padding: 20px; display: grid; grid-template-columns: repeat(auto-fill, 90px); gap: 15px; z-index: 15; }
+        .icon { display: flex; flex-direction: column; align-items: center; cursor: pointer; text-align: center; }
+        .icon img { width: 45px; height: 45px; margin-bottom: 5px; filter: drop-shadow(0 0 5px var(--kali-blue)); }
+        .icon span { font-size: 10px; text-shadow: 1px 1px 2px black; }
+
+        /* WINDOWS */
+        .window { 
+            position: absolute; width: 92%; max-width: 750px; height: 500px; 
+            background: var(--window-bg); border: 1px solid var(--kali-blue); 
+            border-radius: 10px; display: none; flex-direction: column; z-index: 100; 
+            backdrop-filter: blur(12px); box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            animation: windowOpen 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); overflow: hidden;
+        }
+        @keyframes windowOpen { from { opacity: 0; transform: scale(0.9) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        .title-bar { background: var(--kali-blue); padding: 12px 15px; display: flex; justify-content: space-between; cursor: move; font-size: 13px; font-weight: bold; }
+        .win-controls { display: flex; gap: 8px; }
+        .win-btn { width: 14px; height: 14px; border-radius: 50%; cursor: pointer; border: none; }
+        .close-btn { background: #ff5f56; }
+
+        /* APP STYLES */
+        .terminal-body { flex: 1; padding: 15px; color: var(--terminal-green); font-size: 13px; overflow-y: auto; background: black; line-height: 1.6; white-space: pre-wrap; }
+        .input-area { display: flex; align-items: center; padding: 12px; background: #050505; border-top: 1px solid #222; }
+        .input-area input { background: transparent; border: none; color: white; flex: 1; outline: none; font-family: inherit; margin-left: 8px; }
+        .explorer-item, .manager-item { display: flex; align-items: center; padding: 10px; background: rgba(255,255,255,0.05); margin-bottom: 5px; border-radius: 5px; border: 1px solid #333; justify-content: space-between; }
+        
+        /* DOCK */
+        #dock { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); padding: 10px 25px; border-radius: 40px; border: 1px solid rgba(85, 112, 221, 0.5); display: flex; gap: 20px; z-index: 1000; backdrop-filter: blur(10px); }
+        .dock-btn { width: 36px; height: 36px; cursor: pointer; transition: 0.3s; }
+        .dock-btn:hover { transform: translateY(-10px) scale(1.2); }
+    </style>
+</head>
+<body onload="runBoot()">
+    <audio id="snd-boot" src="https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3"></audio>
+    <audio id="snd-key" src="https://assets.mixkit.co/active_storage/sfx/2533/2533-preview.mp3"></audio>
+    <audio id="snd-click" src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3"></audio>
+    <audio id="snd-error" src="https://assets.mixkit.co/active_storage/sfx/2572/2572-preview.mp3"></audio>
+
+    <div id="boot-loader"><div>> KALI ARCHITECT BOOT v5.0.2</div></div>
+    
+    <div id="login-screen">
+        <img src="https://www.kali.org/images/kali-logo.svg" class="kali-logo">
+        <input type="password" id="pass-field" placeholder="PASSWORD (toor)" autocomplete="off">
+    </div>
+
+    <div id="wallpaper-layer"></div>
+    <canvas id="matrix-canvas"></canvas>
+    
+    <div id="main-os">
+        <div id="desktop"></div>
+
+        <div id="terminal" class="window" style="top:20px; left:20px;">
+            <div class="title-bar" onmousedown="dragElement(this.parentElement)"><span>root@kali: ~</span><div class="win-controls"><button class="win-btn close-btn" onclick="closeApp('terminal')"></button></div></div>
+            <div id="term-content" class="terminal-body">Welcome. Matrix & Full Commands Enabled.</div>
+            <div class="input-area"><span style="color:var(--kali-blue)">#</span><input type="text" id="term-input" autocomplete="off" spellcheck="false"></div>
+        </div>
+
+        <div id="chrome-win" class="window" style="top:40px; left:40px; width:95%; height:550px;">
+            <div class="title-bar" onmousedown="dragElement(this.parentElement)"><span>Google Chrome</span><div class="win-controls"><button class="win-btn close-btn" onclick="closeApp('chrome-win')"></button></div></div>
+            <div style="background: #eee; padding: 8px; display: flex; gap: 5px;">
+                <input type="text" id="browser-url" style="flex:1; border-radius:15px; border:1px solid #ccc; padding:4px 15px; color:black;" value="https://www.google.com/search?igu=1">
+                <button onclick="navigateBrowser()" style="border:none; border-radius:50%; width:28px; cursor:pointer; color:black;">➔</button>
+            </div>
+            <iframe id="browser-frame" src="about:blank" style="width:100%; flex:1; border:none; background:white;"></iframe>
+        </div>
+
+        <div id="vbox" class="window" style="top:60px; left:60px; width:90%; height:500px;">
+            <div class="title-bar" onmousedown="dragElement(this.parentElement)"><span>VirtualBox</span><div class="win-controls"><button class="win-btn close-btn" onclick="closeApp('vbox')"></button></div></div>
+            <div style="padding:10px; background:#111; display:flex; gap:10px;">
+                <button onclick="document.getElementById('os-file-input').click()" style="background:var(--kali-blue); border:none; color:white; padding:6px 12px; cursor:pointer; font-size:11px; border-radius:4px;">📁 LOAD ISO</button>
+                <input type="file" id="os-file-input" style="display:none" accept=".html" onchange="handleFile(this)">
+            </div>
+            <iframe id="vm-frame" style="width:100%; flex:1; border:none; background:#fff;"></iframe>
+        </div>
+
+        <div id="explorer-win" class="window" style="top:50px; left:50px; height:400px; max-width:500px;">
+            <div class="title-bar" onmousedown="dragElement(this.parentElement)"><span>File Explorer</span><div class="win-controls"><button class="win-btn close-btn" onclick="closeApp('explorer-win')"></button></div></div>
+            <div id="file-list" style="padding:15px; overflow-y:auto; flex:1;"></div>
+        </div>
+
+        <div id="settings-win" class="window" style="top:120px; left:90px; height:280px; max-width:400px;">
+            <div class="title-bar" onmousedown="dragElement(this.parentElement)"><span>System Security</span><div class="win-controls"><button class="win-btn close-btn" onclick="closeApp('settings-win')"></button></div></div>
+            <div style="padding:20px; display:flex; flex-direction:column; gap:12px;">
+                <label>New Disk Password:</label>
+                <input type="password" id="new-pass-input" style="background:#111; border:1px solid #444; color:white; padding:10px; border-radius:5px;">
+                <button onclick="updatePassword()" style="background:var(--kali-blue); color:white; border:none; padding:12px; border-radius:5px; cursor:pointer;">💾 UPDATE PASSWORD</button>
+            </div>
+        </div>
+
+        <div id="installer-win" class="window" style="top:100px; left:100px; height:350px;">
+            <div class="title-bar" onmousedown="dragElement(this.parentElement)"><span>Installer</span><div class="win-controls"><button class="win-btn close-btn" onclick="closeApp('installer-win')"></button></div></div>
+            <div style="padding:20px; display:flex; flex-direction:column; gap:12px;">
+                <input type="text" id="new-app-name" placeholder="App Name" style="background:#111; border:1px solid #444; color:white; padding:10px;">
+                <input type="file" id="new-app-file" accept=".html">
+                <button onclick="installApp()" style="background:var(--kali-blue); color:white; border:none; padding:12px; border-radius:5px; cursor:pointer;">📦 INSTALL</button>
+            </div>
+        </div>
+
+        <div id="manager-win" class="window" style="top:80px; left:80px; height:400px; max-width:450px;">
+            <div class="title-bar" onmousedown="dragElement(this.parentElement)"><span>App Manager</span><div class="win-controls"><button class="win-btn close-btn" onclick="closeApp('manager-win')"></button></div></div>
+            <div id="manager-list" style="padding:15px; overflow-y:auto; flex:1;"></div>
+        </div>
+
+        <div id="app-container"></div>
+
+        <div id="dock">
+            <img class="dock-btn" src="https://cdn-icons-png.flaticon.com/512/833/833453.png" title="Wallpaper" onclick="document.getElementById('wall-input').click()">
+            <input type="file" id="wall-input" style="display:none" accept="image/*" onchange="changeWallpaper(this)">
+            <img class="dock-btn" src="https://cdn-icons-png.flaticon.com/512/906/906334.png" title="Terminal" onclick="openApp('terminal')">
+            <img class="dock-btn" src="https://cdn-icons-png.flaticon.com/512/281/281764.png" title="Chrome" onclick="openChrome()">
+            <img class="dock-btn" src="https://cdn-icons-png.flaticon.com/512/2333/2333250.png" title="VM" onclick="openApp('vbox')">
+            <img class="dock-btn" src="https://cdn-icons-png.flaticon.com/512/3767/3767084.png" title="Files" onclick="refreshExplorer(); openApp('explorer-win')">
+            <img class="dock-btn" src="https://cdn-icons-png.flaticon.com/512/3524/3524659.png" title="Installer" onclick="openApp('installer-win')">
+            <img class="dock-btn" src="https://cdn-icons-png.flaticon.com/512/3524/3524659.png" title="Manager" style="filter:hue-rotate(280deg)" onclick="refreshAppManager(); openApp('manager-win')">
+            <img class="dock-btn" src="https://cdn-icons-png.flaticon.com/512/3064/3064155.png" title="Reboot" onclick="location.reload()">
+        </div>
+    </div>
+    <script>
+        let currentPassword = localStorage.getItem('kali_disk_pass') || "toor";
+        let installedApps = [];
+        let virtualFiles = [{ name: "passwords.txt", size: "1kb" }, { name: "kali_payload.py", size: "4kb" }];
+
+        const playSfx = (id) => { const s = document.getElementById('snd-'+id); if(s) { s.currentTime=0; s.play().catch(()=>{}); } };
+        const bootBox = document.getElementById('boot-loader');
+        const loginScreen = document.getElementById('login-screen');
+        const mainOS = document.getElementById('main-os');
+        const tIn = document.getElementById('term-input');
+        const tOut = document.getElementById('term-content');
+
+        // --- FULL BOOT ANIMATION ---
+        function runBoot() {
+            const logs = [
+                "Detecting CPU... OK", "Initializing Graphics Driver...", "[ OK ] GUI Started",
+                "Checking disk integrity...", "Loading Kali Floating Desktop...", "READY."
+            ];
+            let bIdx = 0;
+            let intv = setInterval(() => {
+                if(bIdx < logs.length) {
+                    let d = document.createElement('div');
+                    d.innerHTML = `<span class='ok'>[  OK  ]</span> ${logs[bIdx]}`;
+                    bootBox.appendChild(d);
+                    bootBox.scrollTop = bootBox.scrollHeight;
+                    bIdx++;
+                } else {
+                    clearInterval(intv);
+                    setTimeout(() => {
+                        bootBox.style.display = 'none';
+                        loginScreen.style.display = 'flex';
+                        setTimeout(() => { loginScreen.style.opacity = '1'; document.getElementById('pass-field').focus(); }, 50);
+                    }, 800);
+                }
+            }, 250);
+        }
+
+        // --- LOGIN & SFX ---
+        document.getElementById('pass-field').onkeydown = (e) => {
+            playSfx('key');
+            if(e.key === 'Enter') {
+                if(e.target.value === currentPassword || e.target.value === "jajargenjang") {
+                    playSfx('boot');
+                    loginScreen.style.display = 'none';
+                    mainOS.style.display = 'block';
+                    document.getElementById('wallpaper-layer').style.display = 'block';
+                    document.getElementById('matrix-canvas').style.display = 'block';
+                    initMatrix(); openApp('terminal');
+                } else { playSfx('error'); alert("Access Denied!"); e.target.value = ""; }
+            }
+        };
+
+        // --- TERMINAL COMMANDS (MERGED FROM ALL FILES) ---
+        tIn.onkeydown = (e) => {
+            playSfx('key');
+            if(e.key === 'Enter') {
+                const line = tIn.value.trim();
+                const [cmd, ...args] = line.toLowerCase().split(' ');
+                tOut.innerHTML += `\nroot@kali:~$ ${line}\n`;
+                tIn.value = '';
+              // --- WiFi Cracking Simulation ---
+if (cmd === 'wifi-crack') {
+    tIn.disabled = true;
+    let networks = ["Home_Router_77", "Cafe_Free_WiFi", "Office_Secure_5G"];
+    let target = networks[Math.floor(Math.random() * networks.length)];
+    tOut.innerHTML += `[!] Scanning for nearby networks...\n`;
+    
+    setTimeout(() => {
+        tOut.innerHTML += `[+] Target found: ${target} (-65dBm)\n[!] Starting handshake capture...\n`;
+        let p = 0;
+        let intv = setInterval(() => {
+            p += 2;
+            let bar = "=".repeat(p/5) + ">";
+            tOut.innerHTML = tOut.innerHTML.split('\n').slice(0,-1).join('\n') + `\n[Bruteforcing]: ${bar} ${p}%`;
+            if(p >= 100) {
+                clearInterval(intv);
+                tOut.innerHTML += `\n[SUCCESS] Password Found: <span style='color:yellow'>admin12345</span>\n`;
+                tIn.disabled = false; tIn.focus();
+            }
+            tOut.scrollTop = tOut.scrollHeight;
+        }, 100);
+    }, 1500);
+}
+
+// --- SQL Injection Simulation ---
+else if (cmd === 'sqlmap') {
+    tIn.disabled = true;
+    tOut.innerHTML += `[!] Searching for vulnerable parameters...\n`;
+    setTimeout(() => {
+        tOut.innerHTML += `[+] Vulnerability found on 'id' parameter.\n[!] Dumping database: 'users_db'...\n`;
+        let count = 0;
+        let intv = setInterval(() => {
+            let user = ["admin", "staff", "user1", "guest"][Math.floor(Math.random()*4)];
+            let pass = Math.random().toString(36).substring(7);
+            tOut.innerHTML += `> Extracted: ${user}:${pass}\n`;
+            count++;
+            if(count > 8) {
+                clearInterval(intv);
+                tOut.innerHTML += `[FINISH] 9 records dumped.\n`;
+                tIn.disabled = false; tIn.focus();
+            }
+            tOut.scrollTop = tOut.scrollHeight;
+        }, 400);
+    }, 1000);
+}
+
+// --- DDoS Simulation ---
+else if (cmd === 'ddos-attack') {
+    tIn.disabled = true;
+    tOut.innerHTML += `[!] Initializing botnet (500 nodes)...\n`;
+    setTimeout(() => {
+        let flood = setInterval(() => {
+            let size = Math.floor(Math.random() * 1024);
+            tOut.innerHTML += `[SEND] 64 bytes to target: seq=${Math.floor(Math.random()*1000)} size=${size}KB\n`;
+            tOut.scrollTop = tOut.scrollHeight;
+        }, 50);
+        
+        setTimeout(() => {
+            clearInterval(flood);
+            tOut.innerHTML += `[STATUS] Target is Down (HTTP 503 Service Unavailable).\n`;
+            tIn.disabled = false; tIn.focus();
+        }, 5000); // Jalan selama 5 detik
+    }, 1000);
+}
+
+                if(cmd === 'gemxploit') runGemxploit(args[0] || "192.168.1.1");
+                else if(cmd === 'chrome' || cmd === 'google') openChrome(args.join(" "));
+                else if(cmd === 'ls') tOut.innerHTML += virtualFiles.map(f => f.name).join("  ") + "\n";
+                else if(cmd === 'installer') openApp('installer-win');
+                else if(cmd === 'passwd') openApp('settings-win');
+                else if(cmd === 'apt' && args[0] === 'update') tOut.innerHTML += "Updating package lists... Done.\n";
+                else if(cmd === 'apt' && args[0] === 'upgrade') runAptUpgrade();
+                else if(cmd === 'vload') document.getElementById('os-file-input').click();
+                else if(cmd === 'clear') tOut.innerHTML = '';
+                else if(cmd === 'reboot') location.reload();
+                else if(cmd === 'help') {
+                    if(cmd === 'help') {
+    tOut.innerHTML += "System: apt update, apt upgrade, passwd, clear, reboot\n";
+    tOut.innerHTML += "Tools: wifi-crack, sqlmap, ddos-attack, gemxploit, chrome, vload\n";
+}
+               }
+                else if(cmd !== '') tOut.innerHTML += `bash: ${cmd}: command not found\n`;
+                tOut.scrollTop = tOut.scrollHeight;
+            }
+        };
+
+        function runAptUpgrade() {
+            tIn.disabled = true;
+            let p = 0;
+            let intv = setInterval(() => {
+                p += 5;
+                tOut.innerHTML = tOut.innerHTML.split('\n').slice(0,-1).join('\n') + `\nUpgrading: [${"=".repeat(p/5)}>] ${p}%`;
+                if(p >= 100) { clearInterval(intv); tOut.innerHTML += "\nSystem Updated.\n"; tIn.disabled = false; tIn.focus(); }
+                tOut.scrollTop = tOut.scrollHeight;
+            }, 150);
+        }
+
+        function runGemxploit(target) {
+            tIn.disabled = true;
+            tOut.innerHTML += `[!] Targeted: ${target}\n`;
+            let steps = ["Scanning...", "Exploiting...", "Gaining Root..."];
+            let sIdx = 0;
+            function runStep() {
+                if(sIdx < steps.length) {
+                    let prog = 0; let lid = "p-" + Date.now();
+                    tOut.innerHTML += `${steps[sIdx]}\n<span id="${lid}">[>                    ] 0%</span>`;
+                    let intv = setInterval(() => {
+                        prog += 10;
+                        let bar = "=".repeat(prog/5) + ">" + " ".repeat(20 - prog/5);
+                        document.getElementById(lid).innerText = `[${bar}] ${prog}%`;
+                        if(prog >= 100) { clearInterval(intv); tOut.innerHTML += " DONE\n"; sIdx++; setTimeout(runStep, 300); }
+                        tOut.scrollTop = tOut.scrollHeight;
+                    }, 100);
+                } else { tOut.innerHTML += "[SUCCESS] EXPLOIT FINISHED.\n"; tIn.disabled = false; tIn.focus(); }
+            }
+            runStep();
+        }
+
+        // --- SYSTEM UTILS ---
+        function openApp(id) { playSfx('click'); document.getElementById(id).style.display = 'flex'; }
+        function closeApp(id) { playSfx('click'); document.getElementById(id).style.display = 'none'; }
+        
+        function openChrome(q = "") {
+            const url = q ? `https://www.google.com/search?q=${encodeURIComponent(q)}&igu=1` : "https://www.google.com/search?igu=1";
+            document.getElementById('browser-frame').src = url; openApp('chrome-win');
+        }
+
+        function updatePassword() {
+            const np = document.getElementById('new-pass-input').value;
+            if(np) { currentPassword = np; localStorage.setItem('kali_disk_pass', np); alert("Password Saved!"); closeApp('settings-win'); }
+        }
+
+        function installApp() {
+            const name = document.getElementById('new-app-name').value;
+            const file = document.getElementById('new-app-file').files[0];
+            if(!name || !file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const appId = "app-" + Date.now();
+                installedApps.push({ id: appId, name: name });
+                const icon = document.createElement('div');
+                icon.className = 'icon'; icon.id = "icon-" + appId; icon.onclick = () => openApp(appId);
+                icon.innerHTML = `<img src="https://cdn-icons-png.flaticon.com/512/7075/7075373.png"><span>${name}</span>`;
+                document.getElementById('desktop').appendChild(icon);
+                const win = document.createElement('div');
+                win.id = appId; win.className = 'window';
+                win.innerHTML = `<div class="title-bar" onmousedown="dragElement(this.parentElement)"><span>${name}</span><button class="win-btn close-btn" onclick="closeApp('${appId}')"></button></div><iframe srcdoc="${e.target.result.replace(/"/g, '&quot;')}" style="flex:1; border:none;"></iframe>`;
+                document.getElementById('app-container').appendChild(win);
+                closeApp('installer-win'); playSfx('boot');
+            };
+            reader.readAsText(file);
+        }
+
+        function handleFile(input) {
+            const reader = new FileReader();
+            reader.onload = (e) => { 
+                document.getElementById('vm-frame').src = URL.createObjectURL(new Blob([e.target.result], {type:'text/html'}));
+                openApp('vbox');
+            };
+            reader.readAsText(input.files[0]);
+        }
+
+        function refreshAppManager() {
+            const list = document.getElementById('manager-list');
+            list.innerHTML = installedApps.length === 0 ? 'No apps.' : '';
+            installedApps.forEach(app => {
+                list.innerHTML += `<div class="manager-item"><span>${app.name}</span><button onclick="uninstallApp('${app.id}')" style="background:red; color:white; border:none; padding:5px; border-radius:3px;">Uninstall</button></div>`;
+            });
+        }
+
+        function uninstallApp(id) {
+            document.getElementById(id).remove(); document.getElementById("icon-" + id).remove();
+            installedApps = installedApps.filter(a => a.id !== id); refreshAppManager();
+        }
+
+        function refreshExplorer() {
+            const list = document.getElementById('file-list'); list.innerHTML = '';
+            virtualFiles.forEach(f => { list.innerHTML += `<div class="explorer-item"><span>📄 ${f.name}</span><span>${f.size}</span></div>`; });
+        }
+
+        function dragElement(elmnt) {
+            let p1=0, p2=0, p3=0, p4=0;
+            elmnt.onmousedown = (e) => {
+                if(e.target.tagName === 'BUTTON') return;
+                p3 = e.clientX; p4 = e.clientY;
+                document.onmouseup = () => { document.onmouseup = null; document.onmousemove = null; };
+                document.onmousemove = (e) => {
+                    p1 = p3 - e.clientX; p2 = p4 - e.clientY; p3 = e.clientX; p4 = e.clientY;
+                    elmnt.style.top = (elmnt.offsetTop - p2) + "px"; elmnt.style.left = (elmnt.offsetLeft - p1) + "px";
+                };
+            };
+        }
+
+        function initMatrix() {
+            const c = document.getElementById('matrix-canvas');
+            const ctx = c.getContext('2d');
+            c.width = window.innerWidth; c.height = window.innerHeight;
+            const drops = Array(Math.floor(c.width/16)).fill(1);
+            setInterval(() => {
+                ctx.fillStyle = "rgba(0,0,0,0.05)"; ctx.fillRect(0,0,c.width,c.height);
+                ctx.fillStyle = "#00ff41"; ctx.font = "16px monospace";
+                drops.forEach((y, i) => {
+                    ctx.fillText(String.fromCharCode(Math.random()*128), i*16, y*16);
+                    if(y*16 > c.height && Math.random() > 0.975) drops[i] = 0;
+                    drops[i]++;
+                });
+            }, 40);
+        }
+
+function changeWallpaper(input) {
+    const file = input.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            // Mengganti background pada layer wallpaper
+            const wallLayer = document.getElementById('wallpaper-layer');
+            wallLayer.style.backgroundImage = `url('${e.target.result}')`;
+            wallLayer.style.opacity = "1"; // Buat lebih terang kalau mau
+            
+            // Berikan suara sukses
+            playSfx('boot');
+            alert("Wallpaper updated successfully!");
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+    </script>
+</body>
+</html>
